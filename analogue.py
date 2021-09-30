@@ -175,6 +175,14 @@ class Analogue:
             combined = [round(rowSums(var_sim), digits=3) for cpt in range(len(var_sim))]
 
         else:
-            combined = [round(var_sim[], digits=3) for cpt in range(len(var_sim))]
+            pass
+            # combined = [round(var_sim[], digits=3) for cpt in range(len(var_sim))]
 
         return combined
+
+
+precipitation = gr.from_file("precipitation.tif")
+
+precipitation = precipitation.to_pandas()
+
+precipitation.head()

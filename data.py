@@ -1,6 +1,7 @@
 import rasterio
 from rasterio.transform import Affine
 import os
+import georasters as gr
 
 from analogue import cmip5_table
 
@@ -92,4 +93,12 @@ def getCMIP5(var, rcp, model, year, res, lon=None, lat=None, path=''):
     print('all is ok !')
 
 
-getCMIP5(12, 3, 3, 1998, 10)
+# getCMIP5(12, 3, 3, 1998, 10)
+
+precipitation = gr.from_file("precipitation.tif")
+
+precipitation = precipitation.to_pandas()
+
+precipitation.head()
+
+
