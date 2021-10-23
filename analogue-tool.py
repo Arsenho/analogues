@@ -21,6 +21,8 @@ TMAX_PATH = 'wc2.1_10m_tavg/wc2.1_10m_tmax_{}.tif'
 REFERENCE_F = ''
 TAGET_P = ''
 
+PATHS = [PREC_PATH, TAVG_PATH, TMIN_PATH, TMAX_PATH]
+
 africa_cords = [(27.62901, -17.709524),
                 (10.081337, -20.873587),
                 (-6.026967, -3.998587),
@@ -355,8 +357,11 @@ def get_africa_refs(wc_path, directory='', items='all'):
 
 
 def apply_to_files(all_paths):
+    print("------ Extraction Started ------")
     for path in all_paths:
         directory = path.split('/')[0]
+        get_africa_refs(path, directory=directory)
+    print("------ Extraction Ended ------")
 
 
 ref = Site(-75.5, 3.2)
@@ -367,8 +372,9 @@ ref = Site(-75.5, 3.2)
 # print(parallel_ccafs_all(ref, season=2, num_site=4, weight=(0.5, 0.5), z=2, num_threads=4))
 # p_ccafs_all(ref, season=2, num_site=2, weight=(0.5, 0.5), z=2)
 
-print(PREC_PATH)
+# print(PREC_PATH)
 # (get_sub_refs([[-75.5, 3.2], [-78.5, -89.83333333333331]], PREC_PATH, 2))
-get_africa_refs(PREC_PATH, directory='wc2.1_10m_prec', items=2)
-
+# get_africa_refs(PREC_PATH, directory='wc2.1_10m_prec', items=2)
 # print(get_sub_refs([[-75.5, 3.2], [-78.5, -89.83333333333331]], TAVG_PATH))
+
+apply_to_files(PATHS)
