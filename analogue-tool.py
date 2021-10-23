@@ -274,8 +274,8 @@ def parallel_ccafs_all(ref, season, num_site, weight, z, num_threads=4):
 def set_res(results, point):
     assert isinstance(results, dict)
 
-    # results['row'].append(point.row)
-    # results['col'].append(point.col)
+    results['row'].append(point.row)
+    results['col'].append(point.col)
     results['value'].append(point.value)
     results['x'].append(point.x)
     results['y'].append(point.y)
