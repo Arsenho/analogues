@@ -9,13 +9,16 @@ comm = MPI.COMM_WORLD
 nprocs = comm.Get_size()
 rank = comm.Get_rank()
 
+global PREC_PATH
+global TAVG_PATH
+global TMIN_PATH
+global TMAX_PATH
+
+global REFERENCE_F
+global TAGET_P
+
 PREC_PATH = '/opt/Agriculture/wc2.1_10m_prec/wc2.1_10m_prec_{}.tif'
 TAVG_PATH = '/opt/Agriculture/wc2.1_10m_tavg/wc2.1_10m_tavg_{}.tif'
-TMIN_PATH = ''
-TMAX_PATH = ''
-
-REFERENCE_F = ''
-TAGET_P = ''
 
 
 def build_path(path, mth):
@@ -137,10 +140,10 @@ def p_ccafs_all(ref, season, num_site, weight, z):
     comm = MPI.COMM_WORLD
     nprocs = comm.Get_size()
     rank = comm.Get_rank()
-    
-    PREC_PATH = '/opt/Agriculture/wc2.1_10m_prec/wc2.1_10m_prec_{}.tif'
-    TAVG_PATH = '/opt/Agriculture/wc2.1_10m_tavg/wc2.1_10m_tavg_{}.tif'
-    
+
+    # PREC_PATH = '/opt/Agriculture/wc2.1_10m_prec/wc2.1_10m_prec_{}.tif'
+    # TAVG_PATH = '/opt/Agriculture/wc2.1_10m_tavg/wc2.1_10m_tavg_{}.tif'
+
     start_time = time.time()
     assert isinstance(ref, Site), "Must be a site objet with longitude and latitude"
     assert isinstance(weight, tuple), "!!!"
@@ -247,15 +250,17 @@ def parallel_ccafs_all(ref, season, num_site, weight, z, num_threads=4):
     return all_dissimilarities
 
 
-#ref = Site(-75.5, 3.2)
+# ref = Site(-75.5, 3.2)
 # target = Site(-78.5, -89.83333333333331)
 
 # print(ccafs(ref, target, season=2, weight=(0.5, 0.5), z=2))
 # print(ccafs_all(ref, season=2, num_site=1, weight=(0.5, 0.5), z=2))
 # print(parallel_ccafs_all(ref, season=2, num_site=4, weight=(0.5, 0.5), z=2, num_threads=4))
-#p_ccafs_all(ref, season=2, num_site=10, weight=(0.5, 0.5), z=2)
+# p_ccafs_all(ref, season=2, num_site=10, weight=(0.5, 0.5), z=2)
 
 def get_similarity(lat, long, refs_array):
     # refs_array = [[2.343 5.231] [3.233 5.234]]
     reference = Site(lat, long)
     return p_ccafs_all(reference, season=2, num_site=2, weight=(0.5, 0.5), z=2)
+
+
