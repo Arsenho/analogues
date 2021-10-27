@@ -1,1 +1,5 @@
 .env/*
+wc2.1_10m_prec/*
+wc2.1_10m_tavg/*
+wc2.1_10m_tmax/*
+wc2.1_10m_tmin/*

@@ -3,6 +3,9 @@ import pandas as pd
 import math
 import pymp
 import time
+import re
+import importlib.machinery, importlib.util
+import os
 from geopandas import GeoDataFrame
 from shapely.geometry import Point, Polygon
 from mpi4py import MPI
@@ -17,6 +20,10 @@ PREC_PATH = 'wc2.1_10m_prec/wc2.1_10m_prec_{}.tif'
 TAVG_PATH = 'wc2.1_10m_tavg/wc2.1_10m_tavg_{}.tif'
 TMIN_PATH = 'wc2.1_10m_tavg/wc2.1_10m_tmin_{}.tif'
 TMAX_PATH = 'wc2.1_10m_tavg/wc2.1_10m_tmax_{}.tif'
+
+AFRICA_PREC_PATH = 'wc2.1_10m_prec/africa'
+AFRICA_TAVG_PATH = 'wc2.1_10m_tavg/africa'
+
 
 REFERENCE_F = ''
 TAGET_P = ''
@@ -47,6 +54,10 @@ africa_cords = [(27.62901, -17.709524),
 africa_cords_list = []
 
 africa_polygon = Polygon(africa_cords)
+
+
+def filter_csvfile(name):
+    return re.match("^\w+.csv$", name)
 
 
 def check_point_within_africa(lat, long):
@@ -169,14 +180,37 @@ def split_data(data, nprocs, rank):
     return datas[rank]
 
 
-def p_ccafs_all(ref, season, num_site, weight, z):
+def exists_africa(paths):
+    assert isinstance(paths, tuple), ""
+    cpt = 0
+    for path in paths:
+        if str(path).split(".")[-1] == 'csv':
+            cpt += 1
+    if cpt != len(paths):
+        return False
+
+    return True
+
+
+def p_ccafs_all(ref, season, weight, z, sites="africa"):
     start_time = time.time()
     assert isinstance(ref, Site), "Must be a site objet with longitude and latitude"
     assert isinstance(weight, tuple), "!!!"
 
     all_dissimilarities = []
-    path = build_path(PREC_PATH, 1)
-    precs = gr.from_file(path).to_pandas()
+
+    if sites == "africa":
+        files_prec = [f for f in os.listdir(AFRICA_PREC_PATH) if os.path.isfile(os.path.join(AFRICA_PREC_PATH, f))]
+        files_tavg = [f for f in os.listdir(AFRICA_TAVG_PATH) if os.path.isfile(os.path.join(AFRICA_TAVG_PATH, f))]
+        print(files_prec)
+        print(files_tavg)
+        precs = pd.read_csv("{}/{}".format(AFRICA_PREC_PATH, files_prec[0]))
+        num_site = len(precs.value)
+        print(num_site)
+    else:
+        path = build_path(PREC_PATH, 1)
+        precs = gr.from_file(path).to_pandas()
+        num_site = len(precs.value)
 
     # print(precs.head().y)
 
@@ -191,26 +225,45 @@ def p_ccafs_all(ref, season, num_site, weight, z):
         diss = pymp.shared.list()
         with pymp.Parallel(season) as p:
             if not (target.longitude == ref.longitude or target.latitude == ref.latitude):
-                for i in p.range(1, season + 1):
-                    path_prec = build_path(PREC_PATH, i)
-                    path_tavg = build_path(TAVG_PATH, i)
+                if sites == "africa":
+                    for i in p.range(len(files_tavg)):
+                        prec = pd.read_csv("{}/{}".format(AFRICA_PREC_PATH, files_prec[i]))
+                        tavg = pd.read_csv("{}/{}".format(AFRICA_PREC_PATH, files_tavg[i]))
 
-                    prec = gr.from_file(path_prec).to_pandas()
-                    tavg = gr.from_file(path_tavg).to_pandas()
+                        ref_prec = extract(prec, ref)
+                        target_prec = extract(prec, target)
 
-                    ref_prec = extract(prec, ref)
-                    target_prec = extract(prec, target)
+                        ref_tavg = extract(tavg, ref)
+                        target_tavg = extract(tavg, target)
 
-                    ref_tavg = extract(tavg, ref)
-                    target_tavg = extract(tavg, target)
+                        # print(ref_tavg.value, target_tavg.value)
+                        # print(ref_prec.value, target_prec.value)
 
-                    # print(ref_tavg.value, target_tavg.value)
-                    # print(ref_prec.value, target_prec.value)
+                        diss.append((weight[0] * math.pow((ref_tavg.value - target_tavg.value), z)) + (
+                                weight[1] * math.pow((ref_prec.value - target_prec.value), z)))
 
-                    diss.append((weight[0] * math.pow((ref_tavg.value - target_tavg.value), z)) + (
-                            weight[1] * math.pow((ref_prec.value - target_prec.value), z)))
+                    all_dissimilarities.append((target.longitude, target.latitude, math.pow(sum(diss), (1 / z))))
+                else:
+                    for i in p.range(1, season + 1):
+                        path_prec = build_path(PREC_PATH, i)
+                        path_tavg = build_path(TAVG_PATH, i)
 
-                all_dissimilarities.append((target.longitude, target.latitude, math.pow(sum(diss), (1 / z))))
+                        prec = gr.from_file(path_prec).to_pandas()
+                        tavg = gr.from_file(path_tavg).to_pandas()
+
+                        ref_prec = extract(prec, ref)
+                        target_prec = extract(prec, target)
+
+                        ref_tavg = extract(tavg, ref)
+                        target_tavg = extract(tavg, target)
+
+                        # print(ref_tavg.value, target_tavg.value)
+                        # print(ref_prec.value, target_prec.value)
+
+                        diss.append((weight[0] * math.pow((ref_tavg.value - target_tavg.value), z)) + (
+                                weight[1] * math.pow((ref_prec.value - target_prec.value), z)))
+
+                    all_dissimilarities.append((target.longitude, target.latitude, math.pow(sum(diss), (1 / z))))
 
     if rank != 0:
         comm.send(all_dissimilarities, dest=0, tag=rank)
@@ -360,6 +413,8 @@ def apply_to_files(all_paths):
     print("------ Extraction Started ------")
     for path in all_paths:
         directory = path.split('/')[0]
+        res = os.system("mkdir {}/{}".format(directory, "africa"))
+        directory = "{}/{}".format(directory, "africa")
         get_africa_refs(path, directory=directory)
     print("------ Extraction Ended ------")
 
@@ -377,4 +432,5 @@ ref = Site(-75.5, 3.2)
 # get_africa_refs(PREC_PATH, directory='wc2.1_10m_prec', items=2)
 # print(get_sub_refs([[-75.5, 3.2], [-78.5, -89.83333333333331]], TAVG_PATH))
 
-apply_to_files(PATHS)
+# apply_to_files(PATHS)
+p_ccafs_all(ref, season=2, weight=(0.5, 0.5), z=2, sites="africa")
