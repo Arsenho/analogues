@@ -354,12 +354,14 @@ def get_sub_refs(targets, wc_path, items='all'):
         for i in p.range(1, 3):
             path = build_path(wc_path, i)
             all_targets = gr.from_file(path).to_pandas()
+            all_targets.columns = ['row', 'col', 'value', 'x', 'y']
             results = {'value': [], 'x': [], 'y': []}
 
             for j in p.range(len(targets)):
                 # assert isinstance(targ, list), "Make sure item have their longitude and latitude values"
                 site = Site(targets[j][0], targets[j][1])
                 targ = extract(all_targets, site)
+                targ.columns = ['row', 'col', 'value', 'x', 'y']
                 results = set_res(results, targ)
 
             all_dataframes.append(pd.DataFrame(results))
@@ -377,6 +379,7 @@ def get_africa_refs(wc_path, directory='', items='all'):
     for i in range(1, 13):
         path = build_path(wc_path, i)
         all_targets = gr.from_file(path).to_pandas()
+        all_targets.columns = ['row', 'col', 'value', 'x', 'y']
 
         print("all -> {}".format(len(all_targets.row)))
         results = {'row': [], 'col': [], 'value': [], 'x': [], 'y': []}
@@ -433,5 +436,5 @@ ref = Site(-75.5, 3.2)
 # get_africa_refs(PREC_PATH, directory='wc2.1_10m_prec', items=2)
 # print(get_sub_refs([[-75.5, 3.2], [-78.5, -89.83333333333331]], TAVG_PATH))
 
-# apply_to_files(PATHS)
-p_ccafs_all(ref, season=2, weight=(0.5, 0.5), z=2, sites="africa")
+apply_to_files(PATHS)
+#p_ccafs_all(ref, season=2, weight=(0.5, 0.5), z=2, sites="africa")
