@@ -9,6 +9,8 @@ import os
 from geopandas import GeoDataFrame
 from shapely.geometry import Point, Polygon
 from mpi4py import MPI
+import json
+
 
 comm = MPI.COMM_WORLD
 nprocs = comm.Get_size()
@@ -423,7 +425,7 @@ def apply_to_files(all_paths):
     print("------ Extraction Ended ------")
 
 
-ref = Site(-75.5, 3.2)
+ref_of_dschang = Site(5.4527263, 10.0268688)
 # target = Site(-78.5, -89.83333333333331x)
 
 # print(ccafs(ref, target, season=2, weight=(0.5, 0.5), z=2))
@@ -436,5 +438,5 @@ ref = Site(-75.5, 3.2)
 # get_africa_refs(PREC_PATH, directory='wc2.1_10m_prec', items=2)
 # print(get_sub_refs([[-75.5, 3.2], [-78.5, -89.83333333333331]], TAVG_PATH))
 
-apply_to_files(PATHS)
-#p_ccafs_all(ref, season=2, weight=(0.5, 0.5), z=2, sites="africa")
+# apply_to_files(PATHS)
+# p_ccafs_all(ref_of_dschang, season=2, weight=(0.5, 0.5), z=2, sites="africa")
