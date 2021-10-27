@@ -279,6 +279,7 @@ def p_ccafs_all(ref, season, weight, z, sites="africa"):
 
     if rank == 0:
         print(results)
+        return results
 
 
 def parallel_ccafs_all(ref, season, num_site, weight, z, num_threads=4):
@@ -373,7 +374,7 @@ def get_africa_refs(wc_path, directory='', items='all'):
     else:
         num_threads = int(items)
 
-    for i in range(1, 3):
+    for i in range(1, 13):
         path = build_path(wc_path, i)
         all_targets = gr.from_file(path).to_pandas()
 
