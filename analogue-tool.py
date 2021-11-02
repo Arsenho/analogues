@@ -230,7 +230,7 @@ def p_ccafs_all(ref, season, weight, z, sites="africa"):
                 if sites == "africa":
                     for i in p.range(len(files_tavg)):
                         prec = pd.read_csv("{}/{}".format(AFRICA_PREC_PATH, files_prec[i]))
-                        tavg = pd.read_csv("{}/{}".format(AFRICA_PREC_PATH, files_tavg[i]))
+                        tavg = pd.read_csv("{}/{}".format(AFRICA_TAVG_PATH, files_tavg[i]))
 
                         ref_prec = extract(prec, ref)
                         target_prec = extract(prec, target)
