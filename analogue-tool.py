@@ -205,6 +205,14 @@ def p_write_current_result(file, current_result):
         writer.writerow(current_result)
 
 
+def rename_cols(prec, tavg):
+    if prec.keys()[2] == True and tavg.keys()[2] == True:
+        prec.columns = ['row', 'col', 'value', 'x', 'y']
+        tavg.columns = ['row', 'col', 'value', 'x', 'y']
+
+    return prec, tavg
+
+
 def p_ccafs_all(ref, season, weight, z, sites="africa"):
     start_time = time.time()
     if rank == 0:
@@ -259,6 +267,8 @@ def p_ccafs_all(ref, season, weight, z, sites="africa"):
                         prec = pd.read_csv(files_prec[i])
                         tavg = pd.read_csv(files_tavg[i])
 
+                        prec, tavg = rename_cols(prec, tavg)
+
                         ref_prec = extract(prec, ref)
                         target_prec = extract(prec, target)
 
@@ -276,6 +286,8 @@ def p_ccafs_all(ref, season, weight, z, sites="africa"):
                     for i in p.range(len(files_tavg)):
                         prec = gr.from_file(files_prec[i]).to_pandas()
                         tavg = gr.from_file(files_tavg[i]).to_pandas()
+
+                        prec, tavg = rename_cols(prec, tavg)
 
                         ref_prec = extract(prec, ref)
                         target_prec = extract(prec, target)
