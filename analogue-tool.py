@@ -240,7 +240,7 @@ def p_ccafs_all(ref, season, weight, z, sites="africa"):
     # print(num_site)
     # print(precs.head().y)
 
-    list_of_sites = [val for val in range(4)]
+    list_of_sites = [val for val in range(num_site)]
     my_site = split_data(list_of_sites, nprocs, rank)
 
     # print(rank, my_site)
@@ -255,7 +255,7 @@ def p_ccafs_all(ref, season, weight, z, sites="africa"):
         if not (target.longitude == ref.longitude or target.latitude == ref.latitude):
             if sites == "africa":
                 with pymp.Parallel(season) as p:
-                    for i in p.range(4):
+                    for i in p.range(len(files_tavg)):
                         prec = pd.read_csv(files_prec[i])
                         tavg = pd.read_csv(files_tavg[i])
 
