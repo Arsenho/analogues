@@ -1,3 +1,5 @@
+import csv
+
 import georasters as gr
 import pandas as pd
 import math
@@ -11,21 +13,22 @@ from shapely.geometry import Point, Polygon
 from mpi4py import MPI
 import json
 
-
 comm = MPI.COMM_WORLD
 nprocs = comm.Get_size()
 rank = comm.Get_rank()
 
 global PREC_PATH, TAVG_PATH, TMIN_PATH, TMAX_PATH, REFERENCE_F, TAGET_P
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-PREC_PATH = 'wc2.1_10m_prec/wc2.1_10m_prec_{}.tif'
-TAVG_PATH = 'wc2.1_10m_tavg/wc2.1_10m_tavg_{}.tif'
-TMIN_PATH = 'wc2.1_10m_tavg/wc2.1_10m_tmin_{}.tif'
-TMAX_PATH = 'wc2.1_10m_tavg/wc2.1_10m_tmax_{}.tif'
+PREC_PATH = os.path.join(BASE_DIR, 'wc2.1_10m_prec/wc2.1_10m_prec_{}.tif')
+TAVG_PATH = os.path.join(BASE_DIR, 'wc2.1_10m_tavg/wc2.1_10m_tavg_{}.tif')
+TMIN_PATH = os.path.join(BASE_DIR, 'wc2.1_10m_tavg/wc2.1_10m_tmin_{}.tif')
+TMAX_PATH = os.path.join(BASE_DIR, 'wc2.1_10m_tavg/wc2.1_10m_tmax_{}.tif')
 
-AFRICA_PREC_PATH = 'wc2.1_10m_prec/africa'
-AFRICA_TAVG_PATH = 'wc2.1_10m_tavg/africa'
+AFRICA_PREC_PATH = os.path.join(BASE_DIR, 'wc2.1_10m_prec/africa')
+AFRICA_TAVG_PATH = os.path.join(BASE_DIR, 'wc2.1_10m_tavg/africa')
 
+RESULTS_PATH = os.path.join(BASE_DIR, 'results')
 
 REFERENCE_F = ''
 TAGET_P = ''
@@ -194,43 +197,85 @@ def exists_africa(paths):
     return True
 
 
+def p_write_current_result(file, current_result):
+    assert isinstance(file, str), "give a valid file path"
+    assert isinstance(current_result, list), "the data to write must be a list of items"
+    with open(file, "a") as result_file:
+        writer = csv.writer(result_file)
+        writer.writerow(current_result)
+
+
 def p_ccafs_all(ref, season, weight, z, sites="africa"):
     start_time = time.time()
-    assert isinstance(ref, Site), "Must be a site objet with longitude and latitude"
+    if rank == 0:
+        os.system("clear")
+        print("\t\t ==== Compute similarity for a given site ==== \n\n")
+
+    assert isinstance(ref, Site), "Error : Must be a site objet with longitude and latitude"
     assert isinstance(weight, tuple), "!!!"
 
     all_dissimilarities = []
 
     if sites == "africa":
-        files_prec = [f for f in os.listdir(AFRICA_PREC_PATH) if os.path.isfile(os.path.join(AFRICA_PREC_PATH, f))]
-        files_tavg = [f for f in os.listdir(AFRICA_TAVG_PATH) if os.path.isfile(os.path.join(AFRICA_TAVG_PATH, f))]
-        print(files_prec)
-        print(files_tavg)
-        precs = pd.read_csv("{}/{}".format(AFRICA_PREC_PATH, files_prec[0]))
-        num_site = len(precs.value)
-        print(num_site)
+        prec_path = AFRICA_PREC_PATH
+        tavg_path = AFRICA_TAVG_PATH
     else:
-        path = build_path(PREC_PATH, 1)
-        precs = gr.from_file(path).to_pandas()
-        num_site = len(precs.value)
+        prec_path = PREC_PATH
+        tavg_path = TAVG_PATH
 
+    files_prec = [os.path.join(BASE_DIR, prec_path, f) for f in os.listdir(prec_path) if
+                  os.path.isfile(os.path.join(prec_path, f))]
+    files_tavg = [os.path.join(BASE_DIR, tavg_path, f) for f in os.listdir(tavg_path) if
+                  os.path.isfile(os.path.join(tavg_path, f))]
+
+    if rank == 0:
+        print("\t\t==== Collecting data for computation --- OK ==== ")
+
+    # print(files_prec[-1])
+    # print(files_tavg[-1])
+
+    precs = pd.read_csv(files_prec[0])
+    num_site = len(precs.value)
+
+    # print(num_site)
     # print(precs.head().y)
 
-    list_of_sites = [val for val in range(num_site)]
+    list_of_sites = [val for val in range(4)]
     my_site = split_data(list_of_sites, nprocs, rank)
 
     # print(rank, my_site)
+    if rank == 0:
+        print("\t\t==== Start computations ==== ")
+
     for j in my_site:
         target_ = precs.loc[j]
         target = Site(target_.x, target_.y)
-        dissimilarity = 0.0
         diss = pymp.shared.list()
-        with pymp.Parallel(season) as p:
-            if not (target.longitude == ref.longitude or target.latitude == ref.latitude):
-                if sites == "africa":
+
+        if not (target.longitude == ref.longitude or target.latitude == ref.latitude):
+            if sites == "africa":
+                with pymp.Parallel(season) as p:
+                    for i in p.range(4):
+                        prec = pd.read_csv(files_prec[i])
+                        tavg = pd.read_csv(files_tavg[i])
+
+                        ref_prec = extract(prec, ref)
+                        target_prec = extract(prec, target)
+
+                        ref_tavg = extract(tavg, ref)
+                        target_tavg = extract(tavg, target)
+
+                        # print(ref_tavg.value, target_tavg.value)
+                        # print(ref_prec.value, target_prec.value)
+
+                        diss.append((weight[0] * math.pow((ref_tavg.value - target_tavg.value), z)) + (
+                                weight[1] * math.pow((ref_prec.value - target_prec.value), z)))
+
+            else:
+                with pymp.Parallel(season) as p:
                     for i in p.range(len(files_tavg)):
-                        prec = pd.read_csv("{}/{}".format(AFRICA_PREC_PATH, files_prec[i]))
-                        tavg = pd.read_csv("{}/{}".format(AFRICA_TAVG_PATH, files_tavg[i]))
+                        prec = gr.from_file(files_prec[i]).to_pandas()
+                        tavg = gr.from_file(files_tavg[i]).to_pandas()
 
                         ref_prec = extract(prec, ref)
                         target_prec = extract(prec, target)
@@ -244,43 +289,39 @@ def p_ccafs_all(ref, season, weight, z, sites="africa"):
                         diss.append((weight[0] * math.pow((ref_tavg.value - target_tavg.value), z)) + (
                                 weight[1] * math.pow((ref_prec.value - target_prec.value), z)))
 
-                    all_dissimilarities.append((target.longitude, target.latitude, math.pow(sum(diss), (1 / z))))
-                else:
-                    for i in p.range(1, season + 1):
-                        path_prec = build_path(PREC_PATH, i)
-                        path_tavg = build_path(TAVG_PATH, i)
+            current_diss = math.pow(sum(diss), (1 / z))
+            current_result_to_save = [target.longitude, target.latitude, current_diss]
 
-                        prec = gr.from_file(path_prec).to_pandas()
-                        tavg = gr.from_file(path_tavg).to_pandas()
+            p_write_current_result(os.path.join(RESULTS_PATH, '{}_results.csv'.format(rank)),
+                                   current_result_to_save)
+            all_dissimilarities.append(
+                {
+                    'longitude': target.longitude,
+                    'latitude': target.latitude,
+                    'value': current_diss
+                }
+                # (target.longitude, target.latitude, current_diss))
+            )
+        else:
+            pass
 
-                        ref_prec = extract(prec, ref)
-                        target_prec = extract(prec, target)
-
-                        ref_tavg = extract(tavg, ref)
-                        target_tavg = extract(tavg, target)
-
-                        # print(ref_tavg.value, target_tavg.value)
-                        # print(ref_prec.value, target_prec.value)
-
-                        diss.append((weight[0] * math.pow((ref_tavg.value - target_tavg.value), z)) + (
-                                weight[1] * math.pow((ref_prec.value - target_prec.value), z)))
-
-                    all_dissimilarities.append((target.longitude, target.latitude, math.pow(sum(diss), (1 / z))))
+    if rank == 0:
+        print("\t\t==== End computations ==== ")
 
     if rank != 0:
         comm.send(all_dissimilarities, dest=0, tag=rank)
-
+        del all_dissimilarities
     else:
         results = [item for item in all_dissimilarities]
         for rk in range(1, nprocs):
             resp = comm.recv(source=rk, tag=rk)
             results += [elt for elt in resp]
-
-    end_time = time.time() - start_time
-    print(rank, " The computing process took : ", end_time)
-
+        del all_dissimilarities
     if rank == 0:
-        print(results)
+        end_time = time.time() - start_time
+        print("\t\t==== Computation execution time --- {} s ==== ".format(end_time))
+        print("\t\t==== Computation results --- ==== ")
+        print("\t\t", results)
         return results
 
 
@@ -439,4 +480,4 @@ ref_of_dschang = Site(5.4527263, 10.0268688)
 # print(get_sub_refs([[-75.5, 3.2], [-78.5, -89.83333333333331]], TAVG_PATH))
 
 # apply_to_files(PATHS)
-# p_ccafs_all(ref_of_dschang, season=2, weight=(0.5, 0.5), z=2, sites="africa")
+p_ccafs_all(ref_of_dschang, season=2, weight=(0.5, 0.5), z=2, sites="africa")
