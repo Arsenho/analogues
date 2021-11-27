@@ -20,8 +20,8 @@ rank = comm.Get_rank()
 global PREC_PATH, TAVG_PATH, TMIN_PATH, TMAX_PATH, REFERENCE_F, TAGET_P
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-PREC_PATH = os.path.join(BASE_DIR, 'wc2.1_10m_prec/wc2.1_10m_prec_{}.tif')
-TAVG_PATH = os.path.join(BASE_DIR, 'wc2.1_10m_tavg/wc2.1_10m_tavg_{}.tif')
+PREC_PATH = os.path.join(BASE_DIR, 'wc2.1_10m_prec')
+TAVG_PATH = os.path.join(BASE_DIR, 'wc2.1_10m_tavg')
 TMIN_PATH = os.path.join(BASE_DIR, 'wc2.1_10m_tavg/wc2.1_10m_tmin_{}.tif')
 TMAX_PATH = os.path.join(BASE_DIR, 'wc2.1_10m_tavg/wc2.1_10m_tmax_{}.tif')
 
@@ -35,26 +35,28 @@ TAGET_P = ''
 
 PATHS = [PREC_PATH, TAVG_PATH, TMIN_PATH, TMAX_PATH]
 
-africa_cords = [(27.62901, -17.709524),
-                (10.081337, -20.873587),
-                (-6.026967, -3.998587),
-                (-13.641743, 5.845163),
-                (-22.000126, 7.954538),
-                (-31.105649, 12.173288),
-                (-35.796452, 18.149851),
-                (-38.596287, 29.048288),
-                (-35.224105, 36.431101),
-                (-27.738019, 48.384226),
-                (-19.700546, 56.118601),
-                (-6.376472, 51.548288),
-                (8.346274, 56.118601),
-                (14.204722, 47.329538),
-                (29.481663, 36.079538),
-                (35.696542, 26.235788),
-                (39.048178, 10.767038),
-                (38.224351, -1.537649),
-                (34.256286, -11.732962),
-                (27.317094, -18.764212)]
+africa_cords = [
+    (27.62901, -17.709524),
+    (10.081337, -20.873587),
+    (-6.026967, -3.998587),
+    (-13.641743, 5.845163),
+    (-22.000126, 7.954538),
+    (-31.105649, 12.173288),
+    (-35.796452, 18.149851),
+    (-38.596287, 29.048288),
+    (-35.224105, 36.431101),
+    (-27.738019, 48.384226),
+    (-19.700546, 56.118601),
+    (-6.376472, 51.548288),
+    (8.346274, 56.118601),
+    (14.204722, 47.329538),
+    (29.481663, 36.079538),
+    (35.696542, 26.235788),
+    (39.048178, 10.767038),
+    (38.224351, -1.537649),
+    (34.256286, -11.732962),
+    (27.317094, -18.764212)
+]
 
 africa_cords_list = []
 
@@ -77,10 +79,162 @@ def build_path(path, mth):
         return str(path).format(str(mth))
 
 
+def is_in_polygon(polygon, longitude, latitude):
+    current_point = Point(latitude, longitude)
+    return current_point.within(polygon)
+
+
+def tif_to_csv(file, csv_file):
+    tif = gr.from_file(file)
+    df = pd.DataFrame(tif.to_pandas())
+    # tif.plot()
+    # pd.DataFrame(tif.extract(10.0268688, 5.4527263, 2).to_pandas()).to_csv(csv_file + "_")
+    df.to_csv(csv_file)
+
+
 class Site:
     def __init__(self, x, y):
         self.longitude = x
         self.latitude = y
+        self.site_polygon = []
+        self.coordinate = ()
+        self.sites = pd.DataFrame()
+
+    def site_to_tuple(self):
+        return tuple((self.longitude, self.latitude))
+
+    def polygon(self):
+        site_1 = Site(0.25 * self.longitude, self.latitude)
+        site_2 = Site(0.5 * self.longitude, 0.5 * self.latitude)
+        site_3 = Site(0.5 * self.longitude, 1.5 * self.latitude)
+        site_4 = Site(self.longitude, 0.25 * self.latitude)
+        site_5 = Site(self.longitude, 1.75 * self.latitude)
+        site_6 = Site(1.5 * self.longitude, 0.5 * self.latitude)
+        site_7 = Site(1.5 * self.longitude, 1.5 * self.latitude)
+        site_8 = Site(1.75 * self.longitude, self.latitude)
+
+        site_polygon = [
+            site_1.site_to_tuple(), site_2.site_to_tuple(), site_3.site_to_tuple(), site_4.site_to_tuple(),
+            site_5.site_to_tuple(), site_6.site_to_tuple(), site_7.site_to_tuple(), site_8.site_to_tuple()
+        ]
+
+        self.site_polygon = Polygon(site_polygon)
+
+    def build_sites(self, file: str):
+        if file is not None and file != "":
+            tif = gr.from_file(file)
+            df = pd.DataFrame(tif.to_pandas())
+            result = {'row': [], 'col': [], 'x': [], 'y': []}
+
+            for j in range(len(df)):
+                point = df.loc[j]
+                if round(point.x, 1) == round(self.longitude, 1) and round(point.y, 1) == round(
+                        self.latitude, 1):
+                    self.coordinate = (point.x, point.y)
+                if is_in_polygon(self.site_polygon, point.x, point.y):
+                    result['row'].append(point.row)
+                    result['col'].append(point.col)
+                    result['x'].append(point.x)
+                    result['y'].append(point.y)
+
+            self.sites = pd.DataFrame(result)
+        else:
+            pass
+
+    def build_sites_for_africa(self, file: str):
+        if file is not None and file != "":
+            tif = gr.from_file(file)
+            df = pd.DataFrame(tif.to_pandas())
+            result = {'x': [], 'y': []}
+            for j in range(len(df)):
+                point = df.loc[j]
+                if round(point.x, 1) == round(self.longitude, 1) and round(point.y, 1) == round(
+                        self.latitude, 1):
+                    self.coordinate = (point.x, point.y)
+
+                if is_in_polygon(self.site_polygon, point.x, point.y) and is_in_polygon(africa_polygon, point.x,
+                                                                                        point.y):
+                    result['x'].append(point.x)
+                    result['y'].append(point.y)
+
+            self.sites = pd.DataFrame(result)
+        else:
+            pass
+
+
+class Analogue:
+    def __init__(self, site: Site, file=None, num_site=50):
+        self.site = site
+        self.file = file
+        self.num_site = num_site
+        self.init_site()
+
+    def init_site(self):
+        print("""-------Reference site initialization began---------\n""")
+        self.site.polygon()
+        self.site.build_sites(self.file)
+        print("""-------Reference site initialization ended----------\n""")
+
+    def build_analogue_data(self):
+        target_sites = self.site.sites
+        for cpt in range(len(target_sites)):
+            pass
+
+    def similarity(self, seasons=None, weight=None, z=2):
+        print("""-------Start similarity computation----------\n""")
+        start_time = time.time()
+        assert isinstance(weight, tuple), "!!!"
+
+        prec_path = PREC_PATH
+        tavg_path = TAVG_PATH
+
+        files_prec, files_tavg = build_list_of_data_paths(prec_path, tavg_path)
+
+        sites = self.site.sites[0:self.num_site]
+
+        all_dissimilarities = {'x': [], 'y': [], 'similarity': []}
+
+        for j in range(0, self.num_site):
+            target_ = sites.loc[j]
+            target = Site(target_.x, target_.y)
+            diss = pymp.shared.list()
+            with pymp.Parallel(seasons) as p:
+                for i in p.range(len(files_tavg)):
+                    prec = pd.DataFrame(gr.from_file(files_prec[i]).to_pandas())
+                    tavg = pd.DataFrame(gr.from_file(files_tavg[i]).to_pandas())
+
+                    prec = prec[((prec['x'] == target.longitude) & (prec['y'] == target.latitude)) | (
+                            (prec['x'] == self.site.coordinate[0]) & (prec['y'] == self.site.coordinate[1]))]
+                    tavg = tavg[((tavg['x'] == target.longitude) & (tavg['y'] == target.latitude)) | (
+                            (tavg['x'] == self.site.coordinate[0]) & (tavg['y'] == self.site.coordinate[1]))]
+
+                    prec, tavg = rename_cols(prec, tavg)
+                    # print(tavg.iloc[0].value, tavg.iloc[1].value, prec.iloc[0].value, prec.iloc[1].value)
+                    try:
+                        diss.append((weight[0] * math.pow((tavg.iloc[0].value - tavg.iloc[1].value), z)) + (
+                                weight[1] * math.pow((prec.iloc[0].value - prec.iloc[1].value), z)))
+                    except IndexError as error:
+                        print("""-------- IndexError occurred -------------------""" + error.with_traceback())
+
+            current_diss = math.pow(sum(diss), (1 / z))
+            current_result_to_save = [target.longitude, target.latitude, current_diss]
+
+            p_write_current_result(os.path.join(RESULTS_PATH, 'results.csv'),
+                                   current_result_to_save)
+
+            all_dissimilarities['x'].append(target.longitude)
+            all_dissimilarities['y'].append(target.latitude)
+            all_dissimilarities['similarity'].append(current_diss)
+
+            print("""------- Site {} similarity computation ----- ok -----\n""".format(j + 1))
+
+        end_time = time.time() - start_time
+        print("\n The computing process took : ", end_time)
+        print("""\n------- Similarity computations succeed----------\n""")
+
+        pd.DataFrame(all_dissimilarities).to_csv("results.csv")
+        pd.DataFrame(all_dissimilarities).to_json("results.json")
+        return True
 
 
 def dtr(val):
@@ -90,13 +244,13 @@ def dtr(val):
 def extract(var, var_to_extract):
     assert isinstance(var, pd.DataFrame)
     assert isinstance(var_to_extract, Site)
-    indx = 0
+    index = 0
     for i in range(len(var.value)):
         if round(var.x[i], 1) == round(var_to_extract.longitude, 1) and round(var.y[i], 1) == round(
                 var_to_extract.latitude, 1):
-            indx = i
+            index = i
 
-    return var.loc[indx]
+    return var.loc[index]
 
 
 def ccafs(ref, target, season, weight, z):
@@ -213,6 +367,15 @@ def rename_cols(prec, tavg):
     return prec, tavg
 
 
+def build_list_of_data_paths(prec_path, tavg_path):
+    files_prec = [os.path.join(BASE_DIR, prec_path, f) for f in os.listdir(prec_path) if
+                  os.path.isfile(os.path.join(prec_path, f))]
+    files_tavg = [os.path.join(BASE_DIR, tavg_path, f) for f in os.listdir(tavg_path) if
+                  os.path.isfile(os.path.join(tavg_path, f))]
+
+    return files_prec, files_tavg
+
+
 def p_ccafs_all(ref, season, weight, z, sites="africa"):
     start_time = time.time()
     if rank == 0:
@@ -231,10 +394,7 @@ def p_ccafs_all(ref, season, weight, z, sites="africa"):
         prec_path = PREC_PATH
         tavg_path = TAVG_PATH
 
-    files_prec = [os.path.join(BASE_DIR, prec_path, f) for f in os.listdir(prec_path) if
-                  os.path.isfile(os.path.join(prec_path, f))]
-    files_tavg = [os.path.join(BASE_DIR, tavg_path, f) for f in os.listdir(tavg_path) if
-                  os.path.isfile(os.path.join(tavg_path, f))]
+    files_prec, files_tavg = build_list_of_data_paths(prec_path, tavg_path)
 
     if rank == 0:
         print("\t\t==== Collecting data for computation --- OK ==== ")
@@ -337,49 +497,6 @@ def p_ccafs_all(ref, season, weight, z, sites="africa"):
         return results
 
 
-def parallel_ccafs_all(ref, season, num_site, weight, z, num_threads=4):
-    start_time = time.time()
-    assert isinstance(ref, Site), "Must be a site objet with longitude and latitude"
-    assert isinstance(weight, tuple), "!!!"
-
-    path = build_path(PREC_PATH, 1)
-    precs = gr.from_file(path).to_pandas()
-
-    all_dissimilarities = pymp.shared.array(num_site)
-    diss = pymp.shared.array(season)
-
-    with pymp.Parallel(num_threads) as p:
-        for j in p.range(0, num_site):
-            target_ = precs.loc[j]
-            target = Site(target_.x, target_.y)
-            dissimilarity = 0.0
-            if not (target.longitude == ref.longitude or target.latitude == ref.latitude):
-                for i in range(1, season + 1):
-                    path_prec = build_path(PREC_PATH, i)
-                    path_tavg = build_path(TAVG_PATH, i)
-
-                    prec = gr.from_file(path_prec).to_pandas()
-                    tavg = gr.from_file(path_tavg).to_pandas()
-
-                    ref_prec = extract(prec, ref)
-                    target_prec = extract(prec, target)
-
-                    ref_tavg = extract(tavg, ref)
-                    target_tavg = extract(tavg, target)
-
-                    # print(ref_tavg.value, target_tavg.value)
-                    # print(ref_prec.value, target_prec.value)
-
-                    dissimilarity += (weight[0] * math.pow((ref_tavg.value - target_tavg.value), z)) + (
-                            weight[1] * math.pow((ref_prec.value - target_prec.value), z))
-
-                all_dissimilarities[j] = math.pow(dissimilarity, (1 / z))
-
-    end_time = time.time() - start_time
-    print("The computing process took : ", end_time)
-    return all_dissimilarities
-
-
 def set_res(results, point):
     assert isinstance(results, dict)
 
@@ -478,18 +595,11 @@ def apply_to_files(all_paths):
     print("------ Extraction Ended ------")
 
 
-ref_of_dschang = Site(5.4527263, 10.0268688)
-# target = Site(-78.5, -89.83333333333331x)
+if __name__ == "__main__":
+    ref_of_dschang = Site(10.0268688, 5.4527263)
+    analogue = Analogue(site=ref_of_dschang, file="wc2.1_10m_prec_01.tif")
 
-# print(ccafs(ref, target, season=2, weight=(0.5, 0.5), z=2))
-# print(ccafs_all(ref, season=2, num_site=1, weight=(0.5, 0.5), z=2))
-# print(parallel_ccafs_all(ref, season=2, num_site=4, weight=(0.5, 0.5), z=2, num_threads=4))
-# p_ccafs_all(ref, season=2, num_site=2, weight=(0.5, 0.5), z=2)
+    analogue.similarity(seasons=2, weight=(0.5, 0.5), z=2)
 
-# print(PREC_PATH)
-# (get_sub_refs([[-75.5, 3.2], [-78.5, -89.83333333333331]], PREC_PATH, 2))
-# get_africa_refs(PREC_PATH, directory='wc2.1_10m_prec', items=2)
-# print(get_sub_refs([[-75.5, 3.2], [-78.5, -89.83333333333331]], TAVG_PATH))
-
-# apply_to_files(PATHS)
-p_ccafs_all(ref_of_dschang, season=2, weight=(0.5, 0.5), z=2, sites="africa")
+    # tif_to_csv("wc2.1_10m_prec_01.tif", "wc2.1_10m_prec_01.csv")
+    # tif_to_csv("wc2.1_10m_tavg_01.tif", "wc2.1_10m_tavg_01.csv")

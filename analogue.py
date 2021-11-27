@@ -7,6 +7,7 @@ import pandas as pd
 global climstack
 global cmip5_table
 global sim_index_table
+import georasters as gr
 
 class Parameter:
     def __init__(self, x, y, vars, weights, ndivisions, env_data_ref, env_data_targ,
